@@ -1,0 +1,8 @@
+1. Guruh/Kanal kiritish (yangi kelgan xabarlarni olish uchun)
+2. Guruh/Kanal o'chirish
+3. O'zini guruhini set qilish/o'chirish (1 ta bo'ladi)
+4. Jonatish kerak bo'lmagan message typeni belgilab qo'yish (link, file, text, media, location, contact)
+5. Message turini belgilab qo'yish qaysiki agar xabarda o'sha tur bo'lsa uni olib tashlab qolgan qismini yuborish,
+    masalan bir rasm bor caption bilan, siz rasmni belgilab qoygan bolsez, rasmni emas faqat o'sha caption o'zini yuboradi
+6. "Forwarded from" enable/disable
+7. Keyword kiritib qo'yish, post borayotganda o'sha post tagiga o'sha keywordni qo'shib jonatadi

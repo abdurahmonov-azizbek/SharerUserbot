@@ -1,0 +1,19 @@
+{
+    "admin_id": 7305090563,
+    "source_chats": [
+        "@test_source_groupp"
+    ],
+    "target_chat": "@test_target_grou",
+    "filters": {
+        "keywords": [
+            "spam",
+            "test"
+        ],
+        "types": [
+            "video"
+        ],
+        "remove_types": [],
+        "forwarded_from": false,
+        "append_keyword": "Salom, Dunyo!"
+    }
+}
