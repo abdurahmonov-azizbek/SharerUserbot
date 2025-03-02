@@ -6,14 +6,13 @@
     "target_chat": "@test_target_grou",
     "filters": {
         "keywords": [
-            "spam",
-            "test"
+            "comment"
         ],
-        "types": [
-            "video"
+        "types": [],
+        "remove_types": [
+            "link"
         ],
-        "remove_types": [],
         "forwarded_from": false,
-        "append_keyword": "Salom, Dunyo!"
+        "append_keyword": ""
     }
 }

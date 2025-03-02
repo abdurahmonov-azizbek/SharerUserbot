@@ -1,5 +1,6 @@
 import json
 from pyrogram import Client, filters
+import re
 
 
 def load_settings():
@@ -8,7 +9,7 @@ def load_settings():
             return json.load(f)
     except FileNotFoundError:
         return {
-            "admin_id": 7305090563,  # Admin ID
+            "admin_id": 7305090563,  
             "source_chats": [],
             "target_chat": "",
             "filters": {
@@ -37,78 +38,98 @@ async def forward_message(client, message):
 
     # 1️⃣ Check keyword filters (skip if it contains blocked keywords)
     for kw in filters_config["keywords"]:
-        if kw in text:
-            return  
+        if str(kw).lower() in text.lower():
+            return  # Skip the message if it contains blocked keywords
 
     # 2️⃣ Check spammed types (skip if it matches a blocked type)
     spammed_types = filters_config["types"]
     if ("text" in spammed_types and message.text) or \
-       ("link" in spammed_types and message.entities) or \
+       ("link" in spammed_types and has_link(text)) or \
        ("file" in spammed_types and message.document) or \
        ("photo" in spammed_types and message.photo) or \
        ("video" in spammed_types and message.video) or \
        ("location" in spammed_types and message.location) or \
        ("contact" in spammed_types and message.contact):
-        return  
+        return  # Skip the message if it matches a blocked type
 
-    # 3️⃣ Check remove_types (remove only specific parts)
-    remove_types = filters_config["remove_types"]
-    keep_text = True  # We always keep text unless it's in spammed_types
-
-    if "photo" in remove_types and message.photo:
-        message.photo = None
-    if "video" in remove_types and message.video:
-        message.video = None
-    if "file" in remove_types and message.document:
-        message.document = None
-    if "audio" in remove_types and message.audio:
-        message.audio = None
-    if "voice" in remove_types and message.voice:
-        message.voice = None
-    if "sticker" in remove_types and message.sticker:
-        message.sticker = None
-    if "contact" in remove_types and message.contact:
-        message.contact = None
-    if "location" in remove_types and message.location:
-        message.location = None
-    if "text" in remove_types and message.text:
-        keep_text = False  # If "text" is in remove_types, discard the text
-
-    # If everything is removed, don't send anything
-    if not (keep_text or message.photo or message.video or message.document or message.audio or message.voice or message.sticker or message.contact or message.location):
-        return  
-
-    # 4️⃣ Apply append_keyword
+    # 3️⃣ Apply append_keyword
     append_keyword = filters_config["append_keyword"]
-    if append_keyword and keep_text:
+    if append_keyword and text:
         text += f"\n\n{append_keyword}"
 
-    # 5️⃣ Forward message with or without "Forwarded from"
+    remove_types = filters_config["remove_types"]
+    if "link" in remove_types:
+        text = remove_links(text)
+    if "photo" in remove_types:
+        message.photo = None
+
+    # 4️⃣ Forward message with or without "Forwarded from"
     disable_forward_info = filters_config.get("forwarded_from", False)
 
     if not disable_forward_info:
-        if keep_text:
-            await client.send_message(settings["target_chat"], text)
+        # Handle photo with caption
         if message.photo:
-            await client.send_photo(settings["target_chat"], message.photo.file_id, caption=text if keep_text else None)
-        if message.video:
-            await client.send_video(settings["target_chat"], message.video.file_id, caption=text if keep_text else None)
-        if message.document:
-            await client.send_document(settings["target_chat"], message.document.file_id, caption=text if keep_text else None)
-        if message.audio:
-            await client.send_audio(settings["target_chat"], message.audio.file_id, caption=text if keep_text else None)
-        if message.voice:
-            await client.send_voice(settings["target_chat"], message.voice.file_id, caption=text if keep_text else None)
-        if message.sticker:
+            await client.send_photo(settings["target_chat"], message.photo.file_id, caption=text)
+        # Handle text messages
+        elif message.text:
+            await client.send_message(settings["target_chat"], text)
+        # Handle other message types
+        elif message.video:
+            await client.send_video(settings["target_chat"], message.video.file_id, caption=text)
+        elif message.document:
+            await client.send_document(settings["target_chat"], message.document.file_id, caption=text)
+        elif message.audio:
+            await client.send_audio(settings["target_chat"], message.audio.file_id, caption=text)
+        elif message.voice:
+            await client.send_voice(settings["target_chat"], message.voice.file_id, caption=text)
+        elif message.sticker:
             await client.send_sticker(settings["target_chat"], message.sticker.file_id)
-        if message.contact:
+        elif message.contact:
             await client.send_contact(settings["target_chat"], phone_number=message.contact.phone_number, first_name=message.contact.first_name)
-        if message.location:
+        elif message.location:
             await client.send_location(settings["target_chat"], latitude=message.location.latitude, longitude=message.location.longitude)
     else:
         await message.forward(settings["target_chat"])
 
-# Admin buyruqlari
+def has_link(text):
+    """
+    Xabarda link bor-yo'qligini aniqlaydi.
+    :param text: Xabar matni
+    :return: True (agar link bo'lsa), False (agar link bo'lmasa)
+    """
+    # Telegram username linklari (@username)
+    telegram_username_pattern = r"@[a-zA-Z0-9_]{5,}"  # @ belgisi va kamida 5 belgi
+
+    # Oddiy URL manzillar (https://, http:// yoki www. bilan boshlanadiganlar)
+    url_pattern = r"(https?://[^\s]+|www\.[^\s]+)"  # http://, https:// yoki www.
+
+    # Barcha linklarni regex orqali aniqlash
+    if re.search(telegram_username_pattern, text) or re.search(url_pattern, text):
+        return True
+    return False
+
+def remove_links(text):
+    """
+    Xabardagi barcha linklarni o'chirib tashlaydi.
+    :param text: Xabar matni
+    :return: Linklarsiz yangi matn
+    """
+    # Telegram username linklari (@username)
+    telegram_username_pattern = r"@[a-zA-Z0-9_]{5,}"  # @ belgisi va kamida 5 belgi
+
+    # Oddiy URL manzillar (https://, http:// yoki www. bilan boshlanadiganlar)
+    url_pattern = r"(https?://[^\s]+|www\.[^\s]+)"  # http://, https:// yoki www.
+
+    # Barcha linklarni regex orqali o'chirish
+    text = re.sub(telegram_username_pattern, "", text)  # @username larni o'chirish
+    text = re.sub(url_pattern, "", text)  # URL manzillarni o'chirish
+
+    # Qo'shimcha: Agar linklarni o'chirish natijasida ortiqcha bo'shliqlar qolsa, ularni ham tozalash
+    # text = " ".join(text.split())  # Ortiqcha bo'shliqlarni olib tashlash
+
+    return text
+
+# Admin buyruqlari  
 @app.on_message(filters.command("addsource") & filters.user(settings["admin_id"]))
 async def add_source(client, message):
     chat_id = message.text.split(" ")[1]
@@ -154,16 +175,18 @@ async def get_message_types(client, message):
 @app.on_message(filters.command("help"))
 async def help(client, message):
     txt = "/settings - current settings\n" \
-        + "/addsource [@chat_username] - add source chat\n" \
-        + "/delsource [@chat_username] - delete source chat\n" \
-        + "/settarget [@chat_username] - set target chat\n" \
+        + "/addsource @chat_username - add source chat\n" \
+        + "/delsource @chat_username - delete source chat\n" \
+        + "/settarget @chat_username - set target chat\n" \
         + "/getcurtarget - current target chat\n" \
         + "/get_message_types - get all message types in telegram\n" \
-        + "/add_spam_type [type name] - add type to spam types\n" \
-        + "/del_spam_type [type name] - delete type from spam types\n" \
-        + "/set_append [keyword] - set keyword for append\n" \
-        + "/del_removetype [type] - add type for remove\n" \
-        + "/add_removetype [type] - remove type from remove_types\n"
+        + "/add_keyword keyword - add to spam keywords\n" \
+        + "/del_keyword keyword - remove from spam keywords\n" \
+        + "/add_spam_type type - add type to spam types\n" \
+        + "/del_spam_type type  - delete type from spam types\n" \
+        + "/set_append keyword - set keyword for append\n" \
+        + "/del_removetype type - add type for remove\n" \
+        + "/add_removetype type - remove type from remove_types\n"
     
     await message.reply_text(txt)
 
@@ -203,6 +226,19 @@ async def add_spam_type(client, message):
     save_settings(settings)
     await message.reply_text(f"{data} - removed from remove types!")
 
+@app.on_message(filters.command("add_keyword"))
+async def add_spam_type(client, message):
+    data = message.text.split(" ")[1]
+    settings["filters"]["keywords"].append(data)
+    save_settings(settings)
+    await message.reply_text(f"{data} - added to keywords!")
+
+@app.on_message(filters.command("del_keyword"))
+async def add_spam_type(client, message):
+    data = message.text.split(" ")[1]
+    settings["filters"]["keywords"].remove(data)
+    save_settings(settings)
+    await message.reply_text(f"{data} - removed from keywords!")
 
 
 app.run()
